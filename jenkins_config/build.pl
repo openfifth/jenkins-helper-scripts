@@ -8,8 +8,8 @@ my $env_vars = {
     SYNC_REPO          => $ENV{SYNC_REPO} || '.',
     LOCAL_USER_ID      => qx{id -u},
     COVERAGE           => $ENV{COVERAGE},
-    KOHA_IMAGE         => $ENV{KOHA_IMAGE} || 'master',
-    KTD_BRANCH         => $ENV{KTD_BRANCH} || 'master',
+    KOHA_IMAGE         => $ENV{KOHA_IMAGE} || 'main',
+    KTD_BRANCH         => $ENV{KTD_BRANCH} || 'main',
     TEST_SUITE         => $ENV{TEST_SUITE} // 'full',
     TEST_DB_UPGRADE    => $ENV{TEST_DB_UPGRADE} // 'no',
     DBMS_YML           => $ENV{DBMS_YML} || '',
@@ -53,7 +53,7 @@ if ( $ENV{DBMS_YML} ) {
         push @docker_compose_yml, 'docker-compose.mariadb_d9.yml';
     } elsif ( $ENV{KOHA_IMAGE} =~ m|buster| ) {
         push @docker_compose_yml, 'docker-compose.mariadb_d10.yml';
-    } elsif ( $ENV{KOHA_IMAGE} =~ m|bullseye| || $ENV{KOHA_IMAGE} eq 'master' ) {
+    } elsif ( $ENV{KOHA_IMAGE} =~ m|bullseye| || $ENV{KOHA_IMAGE} eq 'main' ) {
         push @docker_compose_yml, 'docker-compose.mariadb_d11.yml';
     } elsif ( $ENV{KOHA_IMAGE} =~ m|bookworm| ) {
         push @docker_compose_yml, 'docker-compose.mariadb_d12.yml';
