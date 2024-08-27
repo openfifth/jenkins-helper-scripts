@@ -128,7 +128,10 @@ sub docker_cleanup {
         run(qq{docker rm \$(docker ps -a -f "name=koha_" -q)});
     }
 
-    run(q{docker volume prune -f});
-    run(q{docker image  prune -f});
-    run(q{docker system prune -a -f});
+    run(q{docker container prune -f});
+    run(q{docker volume prune    -f});
+    run(q{docker network prune   -f});
+
+    my $nb_days = $ENV{JENKINS_NODE_KEEP_DOCKER_NB_DAYS};
+    run(q{docker image prune -a -f} . $nb_days ? sprintf q{--filter until=%sd}, $nb_days : q{}});
 }
