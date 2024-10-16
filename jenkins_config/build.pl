@@ -133,5 +133,5 @@ sub docker_cleanup {
     run(q{docker network prune   -f});
 
     my $nb_days = $ENV{JENKINS_NODE_KEEP_DOCKER_NB_DAYS};
-    run(q{docker image prune -a -f} . $nb_days ? sprintf q{--filter until=%sd}, $nb_days : q{});
+    run(q{docker image prune -a -f} . ( $nb_days ? sprintf q{--filter until=%sd}, $nb_days : q{} ));
 }
