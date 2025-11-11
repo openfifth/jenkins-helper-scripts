@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bom xmlns="https://cyclonedx.org/schema/bom/1.4" version="1" serialNumber="urn:uuid:[% serial | html %]">
+    <metadata>
+        <timestamp>[% timestamp | html %]</timestamp>
+        <tools>
+            <tool>
+                <vendor>Koha Community</vendor>
+                <name>[% tool_name | html %]</name>
+                <version>[% tool_version | html %]</version>
+            </tool>
+        </tools>
+        <component type="application">
+            <name>Koha</name>
+            <version>[% app_version | html %]</version>
+        </component>
+    </metadata>
+    <components>
+[% FOREACH component IN components -%]
+        <component type="library" bom-ref="[% component.purl | html %]">
+            <name>[% component.name | html %]</name>
+            <version>[% component.version | html %]</version>
+            <purl>[% component.purl | html %]</purl>
+            <scope>[% component.scope | html %]</scope>
+        </component>
+[% END -%]
+    </components>
+</bom>

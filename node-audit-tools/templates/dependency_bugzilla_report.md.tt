@@ -1,0 +1,80 @@
+# Node.js Dependency Security Report
+
+**Generated**: [% generated_at | html %]
+**Package Manager**: [% tool | html %]
+
+## Security Vulnerabilities
+
+[% IF vulnerabilities.size %]
+[% FOREACH vuln IN vulnerabilities -%]
+### [% vuln.package | html %] ([% vuln.severity_label | html %])
+
+**Package**: [% vuln.package | html %]
+**Severity**: [% vuln.severity_label | html %]
+**Current Version**: [% vuln.current_version | html %]
+
+[% IF vuln.fixed_in %]
+**Fixed In**: [% vuln.fixed_in | html %]
+**Recommendation**: Update to [% vuln.fixed_in | html %]
+[% ELSIF vuln.recommendation %]
+**Recommendation**: [% vuln.recommendation | html %]
+[% ELSE %]
+**Recommendation**: Monitor for updates
+[% END %]
+
+[% IF vuln.url %]
+**Details**: [% vuln.url | html %]
+[% END %]
+
+[% IF vuln.dependency_paths.size %]
+**Dependency Paths**:
+```
+[% FOREACH path IN vuln.dependency_paths -%]
+[% path | html %]
+[% END -%]
+```
+[% END %]
+
+[% IF vuln.direct_dependencies.size %]
+**Direct Dependencies**:
+[% FOREACH dep IN vuln.direct_dependencies -%]
+- [% dep.info | html %]
+[% END %]
+
+[% END %]
+
+[% END -%]
+[% ELSE %]
+No vulnerabilities detected at configured severity threshold.
+[% END %]
+
+## Outdated Packages
+
+[% IF outdated.size %]
+[% FOREACH item IN outdated -%]
+### [% item.name | html %]
+
+**Current**: [% item.current | html %]
+**Wanted**: [% item.wanted | html %]
+**Latest**: [% item.latest | html %]
+
+[% IF item.resolved %]
+**Resolved**: [% item.resolved | html %]
+[% END %]
+
+[% IF item.scope %]
+**Scope**: [% item.scope | html %]
+[% END %]
+
+**Update Type**: [% item.update | html %]
+
+[% END -%]
+[% ELSE %]
+All listed dependencies are on the latest locked versions.
+[% END %]
+
+## Next Steps
+
+1. Review vulnerabilities and schedule fixes in Bugzilla.
+2. Plan updates for major-version or security related packages.
+3. Validate dependency changes in a controlled environment.

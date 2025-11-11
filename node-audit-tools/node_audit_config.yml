@@ -1,0 +1,51 @@
+# Node.js dependency management configuration
+
+tools:
+  yarn:
+    check: 'yarn --version'
+    install: 'yarn install --frozen-lockfile --ignore-scripts'
+    commands:
+      outdated: 'yarn outdated --json'
+      audit: 'yarn audit --json --level moderate'
+      list: 'yarn list --json'
+      why: 'yarn why'
+  npm:
+    check: 'npm --version'
+    install: 'npm ci --ignore-scripts'
+    commands:
+      outdated: 'npm outdated --json'
+      audit: 'npm audit --json --audit-level moderate'
+      list: 'npm list --json'
+      why: 'npm explain'
+
+detection_order:
+  - yarn
+  - npm
+
+sbom:
+  output_file: 'node_modules_sbom.xml'
+  template: 'dependency_sbom.xml.tt'
+  include_dev_dependencies: true
+
+bugzilla:
+  output_file: 'dependency_bugzilla_report.md'
+  template: 'dependency_bugzilla_report.md.tt'
+  show_vulnerabilities: true
+  show_outdated: true
+  show_next_steps: true
+  summary: true
+  dependency_path_limit: 0   # 0 disables truncation, use positive integer to limit paths per vulnerability
+  severity_order:
+    - critical
+    - high
+    - moderate
+    - low
+    - info
+  metadata: {}
+  metadata_env: []            # entries may be ENV_NAME or label=ENV_NAME
+
+thresholds:
+  audit_fail_level: 'moderate'
+  major_version_fail: 1
+  vulnerable_fail: 0          # set to 1 to fail if any vulnerability is detected
+  compromise_fail_on_match: 1 # fail if compromised package check finds a hit
