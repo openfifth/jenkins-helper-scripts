@@ -1,0 +1,5 @@
+{"type":"auditAdvisory","data":{"resolution":{"id":1093539,"path":"test>package","dev":false},"advisory":{"findings":[{"version":"1.0.0","paths":["test>package"]}],"title":"Test vulnerability","cves":["CVE-2021-00000"],"severity":"high","module_name":"test-package","vulnerable_versions":"<2.0.0","patched_versions":">=2.0.0","url":"https://example.com"}}}
+not valid json at all!
+{"type":"auditAdvisory","data":{"resolution":{"id":1093540,"path":"another>package","dev":false},"advisory":{"findings":[{"version":"3.0.0","paths":["another>package"]}],"title":"Another vulnerability","cves":[],"severity":"moderate","module_name":"another-package","vulnerable_versions":"<4.0.0","patched_versions":">=4.0.0","url":"https://example.com"}}}
+{incomplete json
+{"type":"auditSummary","data":{"vulnerabilities":{"info":0,"low":0,"moderate":1,"high":1,"critical":0},"dependencies":50,"devDependencies":25,"optionalDependencies":0,"totalDependencies":50}}

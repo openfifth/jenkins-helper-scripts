@@ -1,0 +1,2 @@
+{"type":"info","data":"Color legend : \"<red>\" : Major Update backward-incompatible updates "}
+{"type":"table","data":{"head":["Package","Current","Wanted","Latest","Package Type","URL"],"body":[["lodash","4.17.19","4.17.21","4.17.21","dependencies","https://github.com/lodash/lodash#readme"],["webpack","4.46.0","4.46.0","5.88.2","devDependencies","https://github.com/webpack/webpack"],["typescript","3.9.7","3.9.10","5.2.2","devDependencies","https://github.com/Microsoft/TypeScript#readme"]]}}

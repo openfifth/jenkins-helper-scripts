@@ -1,0 +1,33 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "valid-package": {
+      "name": "valid-package",
+      "severity": "high",
+      "via": [
+        {
+          "url": "https://example.com/valid",
+          "title": "Valid vulnerability"
+        }
+      ],
+      "nodes": [
+        "node_modules/valid-package"
+      ],
+      "fixAvailable": true
+    },
+    "invalid-entry": "this is a string not a hash",
+    "another-valid": {
+      "name": "another-valid",
+      "severity": "moderate",
+      "via": [],
+      "nodes": [
+        "node_modules/another-valid"
+      ]
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "total": 3
+    }
+  }
+}

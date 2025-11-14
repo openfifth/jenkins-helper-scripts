@@ -1,0 +1,6 @@
+{"type":"info","data":"Checking for outdated packages..."}
+{"type":"table","data":{"head":["Package","Current","Wanted","Latest","Package Type","URL"],"body":[["valid-package","1.0.0","1.0.1","2.0.0","dependencies","https://example.com"]]}}
+not valid json line
+{"type":"table","data":{"head":["Package","Current","Wanted","Latest"],"body":[["another-package","2.0.0","2.1.0","2.1.0","devDependencies","https://example.com"]]}}
+{incomplete
+{"type":"table","data":{"head":["Package","Current"],"body":[["too-few-columns","3.0.0"]]}}

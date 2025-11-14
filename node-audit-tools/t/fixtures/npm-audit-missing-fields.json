@@ -1,0 +1,29 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "pkg-no-severity": {
+      "name": "pkg-no-severity",
+      "via": [
+        {
+          "url": "https://example.com/advisory"
+        }
+      ],
+      "nodes": [
+        "node_modules/pkg-no-severity"
+      ]
+    },
+    "pkg-no-via": {
+      "name": "pkg-no-via",
+      "severity": "moderate",
+      "nodes": [
+        "node_modules/pkg-no-via"
+      ],
+      "fixAvailable": false
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "total": 2
+    }
+  }
+}

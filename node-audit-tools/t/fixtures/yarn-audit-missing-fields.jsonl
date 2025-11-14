@@ -1,0 +1,2 @@
+{"type":"auditAdvisory","data":{"resolution":{"id":1093539},"advisory":{"findings":[{"version":"1.0.0"}],"severity":"high","vulnerable_versions":"<2.0.0"}}}
+{"type":"auditAdvisory","data":{"resolution":{},"advisory":{"module_name":"pkg-with-no-cves","severity":"moderate","vulnerable_versions":"<1.0.0","patched_versions":">=1.0.0"}}}

@@ -1,0 +1,15 @@
+{
+  "valid-package": {
+    "current": "1.0.0",
+    "wanted": "1.0.1",
+    "latest": "2.0.0",
+    "location": "node_modules/valid-package"
+  },
+  "invalid-entry": "this is a string not a hash",
+  "another-valid": {
+    "current": "2.0.0",
+    "wanted": "2.1.0",
+    "latest": "2.1.0",
+    "location": "node_modules/another-valid"
+  }
+}

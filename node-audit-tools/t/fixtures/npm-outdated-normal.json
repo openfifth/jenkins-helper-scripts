@@ -1,0 +1,23 @@
+{
+  "lodash": {
+    "current": "4.17.19",
+    "wanted": "4.17.21",
+    "latest": "4.17.21",
+    "dependent": "my-project",
+    "location": "node_modules/lodash"
+  },
+  "webpack": {
+    "current": "4.46.0",
+    "wanted": "4.46.0",
+    "latest": "5.88.2",
+    "dependent": "my-project",
+    "location": "node_modules/webpack"
+  },
+  "typescript": {
+    "current": "3.9.7",
+    "wanted": "3.9.10",
+    "latest": "5.2.2",
+    "dependent": "my-project",
+    "location": "node_modules/typescript"
+  }
+}
