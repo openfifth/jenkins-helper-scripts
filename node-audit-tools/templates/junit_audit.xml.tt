@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="npm-audit" tests="[% total_tests %]" failures="[% failures %]" errors="[% errors %]" time="0" timestamp="[% timestamp %]">
+[% IF vulnerabilities.size > 0 -%]
+[% FOREACH vuln IN vulnerabilities -%]
+    <testcase name="[% vuln.package | html %]" classname="security.[% vuln.severity %]" time="0">
+[% IF vuln.severity == 'critical' || vuln.severity == 'high' -%]
+      <failure message="[% vuln.title | html %]" type="[% vuln.severity %]">
+[% ELSIF vuln.severity == 'moderate' -%]
+      <error message="[% vuln.title | html %]" type="[% vuln.severity %]">
+[% ELSE -%]
+      <system-out>
+[% END -%]
+Package: [% vuln.package | html %]
+Severity: [% vuln.severity %]
+Title: [% vuln.title | html %]
+CVE: [% vuln.cve_str | html %]
+Vulnerable: [% vuln.vulnerable_versions | html %]
+Patched: [% vuln.patched_versions | html %]
+[% IF vuln.severity == 'critical' || vuln.severity == 'high' -%]
+      </failure>
+[% ELSIF vuln.severity == 'moderate' -%]
+      </error>
+[% ELSE -%]
+      </system-out>
+[% END -%]
+    </testcase>
+[% END -%]
+[% ELSE -%]
+    <testcase name="no-vulnerabilities" classname="security.audit" time="0" />
+[% END -%]
+  </testsuite>
+</testsuites>

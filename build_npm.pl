@@ -16,18 +16,13 @@ my $SYNC_REPO      = $ENV{SYNC_REPO}      || q{.};
 my $NPM_TEST_SUITE = $ENV{NPM_TEST_SUITE} || 'audit';
 my $KOHA_IMAGE     = $ENV{KOHA_IMAGE}     || 'main';
 
-my $KTD_BRANCH = $ENV{KTD_BRANCH} || 'main';
-my $DB_IMAGE   = $ENV{DB_IMAGE}   || q{};
-my $DBMS_YML   = $ENV{DBMS_YML}   || q{};
-
-my $NODE_DEP_CHECK_MODES   = $ENV{NODE_DEP_CHECK_MODES}   || 'outdated,audit,bugzilla';
+my $NODE_DEP_CHECK_MODES   = $ENV{NODE_DEP_CHECK_MODES}   || 'outdated,audit,sbom,bugzilla,junit';
 my $NODE_DEP_CHECK_JSON    = $ENV{NODE_DEP_CHECK_JSON}    || q{};
 my $NODE_DEP_CHECK_VERBOSE = $ENV{NODE_DEP_CHECK_VERBOSE} || '0';
 
 print "NPM_TEST_SUITE: $NPM_TEST_SUITE\n";
 print "SYNC_REPO: $SYNC_REPO\n";
 print "KOHA_IMAGE: $KOHA_IMAGE\n";
-print "KTD_BRANCH: $KTD_BRANCH\n";
 
 chdir $SYNC_REPO or die "Cannot change to $SYNC_REPO: $OS_ERROR";
 print join q{}, 'Working directory: ', getcwd(), "\n\n";
@@ -66,99 +61,10 @@ else {
     $tools_source_dir = $temp_dir;
 }
 
-my $env_vars = {
-    RUN_TESTS_AND_EXIT => 'no',          # We'll run our own scripts
-    SYNC_REPO          => q{.},
-    LOCAL_USER_ID      => qx{id -u},
-    KOHA_IMAGE         => $KOHA_IMAGE,
-    KTD_BRANCH         => $KTD_BRANCH,
-    DB_IMAGE           => $DB_IMAGE,
-    DBMS_YML           => $DBMS_YML,
-};
-while ( my ( $var, $value ) = each %{$env_vars} ) {
-    $ENV{$var} = $value;
-}
+my $koha_image = "koha/koha-testing:$KOHA_IMAGE";
 
-my @docker_compose_yml;
-my $GITLAB_RAW_URL = join q{}, 'https://gitlab.com/koha-community/koha-testing-docker/raw/', $ENV{KTD_BRANCH};
-
-push @docker_compose_yml, 'docker-compose-light.yml';
-
-unless ( $ENV{DB_IMAGE} ) {
-    if ( $ENV{DBMS_YML} ) {
-        push @docker_compose_yml, $ENV{DBMS_YML};
-    }
-    else {
-        if ( $ENV{KOHA_IMAGE} =~ m{stretch} ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_d9.yml';
-        }
-        elsif ( $ENV{KOHA_IMAGE} =~ m{buster} ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_d10.yml';
-        }
-        elsif ( $ENV{KOHA_IMAGE} =~ m{bullseye} || $ENV{KOHA_IMAGE} eq 'main' ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_d11.yml';
-        }
-        elsif ( $ENV{KOHA_IMAGE} =~ m{bookworm} ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_d12.yml';
-        }
-        elsif ( $ENV{KOHA_IMAGE} =~ m{bionic} ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_u18.yml';
-        }
-        elsif ( $ENV{KOHA_IMAGE} =~ m{focal} ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_u20.yml';
-        }
-        elsif ( $ENV{KOHA_IMAGE} =~ m{jammy} ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_u22.yml';
-        }
-        elsif ( $ENV{KOHA_IMAGE} =~ m{sid} ) {
-            push @docker_compose_yml, 'docker-compose.mariadb_latest.yml';
-        }
-    }
-}
-
-print "\nDownloading docker-compose files\n";
-for my $yml (@docker_compose_yml) {
-    run( qq{wget -O $yml $GITLAB_RAW_URL/$yml}, { exit_on_error => 1 } );
-}
-
-my $env_file           = '.env';
-my $docker_compose_env = "$GITLAB_RAW_URL/env/defaults.env";
-run( qq{wget -O $env_file $docker_compose_env}, { exit_on_error => 1 } );
-
-{
-    open my $in_fh, '<', $env_file or die "Cannot open $env_file for reading: $OS_ERROR";
-    my @lines = <$in_fh>;
-    close $in_fh;
-
-    open my $out_fh, '>', $env_file or die "Cannot open $env_file for writing: $OS_ERROR";
-    for my $line (@lines) {
-        if ( $line =~ /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/ ) {
-            my ( $key, $val ) = ( $1, $2 );
-            if ( exists $ENV{$key} ) {
-                $line = "$key=$ENV{$key}\n";
-            }
-        }
-        print $out_fh $line;
-    }
-    close $out_fh;
-}
-
-docker_cleanup();
-
-print "\nPulling Docker images\n";
-my $cmd = join q{ }, 'docker compose', join( q{ }, map {"-f $_"} @docker_compose_yml ), 'pull --quiet';
-run( $cmd, { exit_on_error => 1 } );
-
-print "\nStarting Docker containers\n";
-$cmd = join q{ }, 'docker compose', join( q{ }, map {"-f $_"} @docker_compose_yml ), '-p koha up -d';
-run( $cmd, { exit_on_error => 1 } );
-
-print "Waiting for containers to be ready...\n";
-sleep 5;
-
-print "\nCopying node-audit-tools into container\n";
-my $tools_path = catdir( $tools_source_dir, 'node-audit-tools' );
-run( "docker compose -p koha cp $tools_path koha:/kohadevbox/", { exit_on_error => 1 } );
+print "\nPulling Docker image: $koha_image\n";
+run( "docker pull $koha_image", { exit_on_error => 1 } );
 
 print "\nRunning $NPM_TEST_SUITE test suite\n\n";
 
@@ -171,11 +77,6 @@ if ( $NPM_TEST_SUITE eq 'audit' || $NPM_TEST_SUITE eq 'full' ) {
 if ( $NPM_TEST_SUITE eq 'build' || $NPM_TEST_SUITE eq 'full' ) {
     $exit_code = run_build_in_container() if $exit_code == 0;
 }
-
-print "\nCleaning up\n";
-docker_cleanup();
-run(qq{rm $_}) for @docker_compose_yml;
-run(q{rm -rf .env});
 
 if ( $exit_code == 0 ) {
     print "\nTest suite completed successfully\n";
@@ -197,6 +98,7 @@ sub run_audit_in_container {
     push @args, '--audit'    if $mode_flags{audit};
     push @args, '--sbom'     if $mode_flags{sbom};
     push @args, '--bugzilla' if $mode_flags{bugzilla};
+    push @args, '--junit'    if $mode_flags{junit};
     push @args, '--verbose'  if $NODE_DEP_CHECK_VERBOSE;
     push @args, '--json',         $NODE_DEP_CHECK_JSON if $NODE_DEP_CHECK_JSON;
     push @args, '--config-file',  '/kohadevbox/node-audit-tools/node_audit_config.yml';
@@ -204,13 +106,23 @@ sub run_audit_in_container {
 
     my $args_str = join( q{ }, map {"'$_'"} @args );
 
-    my $install_cmd = 'docker compose -p koha exec -T koha bash -c "cd /kohadevbox/koha && yarn install --frozen-lockfile"';
+    my $workspace   = getcwd();
+    my $tools_path  = catdir( $tools_source_dir, 'node-audit-tools' );
+    my $koha_image  = "koha/koha-testing:$KOHA_IMAGE";
+
+    # Build docker run command with volume mounts
+    my $docker_base = qq{docker run --rm -t};
+    $docker_base .= qq{ -v "$workspace:/kohadevbox/koha"};
+    $docker_base .= qq{ -v "$tools_path:/kohadevbox/node-audit-tools"};
+    $docker_base .= qq{ -w /kohadevbox/koha};
+    $docker_base .= qq{ $koha_image};
+
+    my $install_cmd = qq{$docker_base bash -c "yarn install --frozen-lockfile"};
     print "Installing dependencies...\n";
-    my $result = run( $install_cmd, { exit_on_error => 0 } );
+    my $result = run( $install_cmd, { exit_on_error => 0, use_pipe => 1 } );
     return $result if $result != 0;
 
-    my $audit_cmd =
-        "docker compose -p koha exec -T koha bash -c 'cd /kohadevbox/koha && PERL5LIB=/kohadevbox/node-audit-tools/lib:\$PERL5LIB /usr/bin/perl /kohadevbox/node-audit-tools/node_audit_dependencies.pl $args_str'";
+    my $audit_cmd = qq{$docker_base bash -c "PERL5LIB=/kohadevbox/node-audit-tools/lib:\\\$PERL5LIB /usr/bin/perl /kohadevbox/node-audit-tools/node_audit_dependencies.pl $args_str"};
     print "Running dependency audit...\n";
     return run( $audit_cmd, { exit_on_error => 0, use_pipe => 1 } );
 }
@@ -218,7 +130,10 @@ sub run_audit_in_container {
 sub run_build_in_container {
     print "Running build check in container...\n\n";
 
-    my $build_cmd = 'docker compose -p koha exec -T koha bash -c "cd /kohadevbox/koha && yarn build"';
+    my $workspace  = getcwd();
+    my $koha_image = "koha/koha-testing:$KOHA_IMAGE";
+
+    my $build_cmd = qq{docker run --rm -t -v "$workspace:/kohadevbox/koha" -w /kohadevbox/koha $koha_image bash -c "yarn build"};
     return run( $build_cmd, { exit_on_error => 0, use_pipe => 1 } );
 }
 
@@ -254,22 +169,4 @@ sub run {
 
         return $exit_code;
     }
-}
-
-sub docker_cleanup {
-    run( join q{ }, q{docker compose}, join( q{ }, map {"-f $_"} @docker_compose_yml ), q{-p koha down} );
-
-    my $containers = qx{docker ps -a -f "name=koha_" -q};
-    chomp $containers;
-    if ($containers) {
-        run(qq{docker stop \$(docker ps -a -f "name=koha_" -q)});
-        run(qq{docker rm \$(docker ps -a -f "name=koha_" -q)});
-    }
-
-    run(q{docker container prune -f});
-    run(q{docker volume prune    -f});
-    run(q{docker network prune   -f});
-
-    my $nb_days = $ENV{JENKINS_NODE_KEEP_DOCKER_NB_DAYS};
-    run( q{docker image prune -a -f} . ( $nb_days ? sprintf q{ --filter until=%sd}, $nb_days : q{} ) );
 }

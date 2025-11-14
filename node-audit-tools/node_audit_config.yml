@@ -44,6 +44,9 @@ bugzilla:
   metadata: {}
   metadata_env: []            # entries may be ENV_NAME or label=ENV_NAME
 
+junit:
+  output_file: 'junit_npm_audit.xml'
+
 thresholds:
   audit_fail_level: 'moderate'
   major_version_fail: 1

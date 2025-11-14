@@ -140,6 +140,7 @@ sub main {
     my $opt_audit        = 0;
     my $opt_sbom         = 0;
     my $opt_bugzilla     = 0;
+    my $opt_junit        = 0;
     my $opt_verbose      = 0;
     my $opt_config_file  = q{};
     my $opt_template_dir = q{};
@@ -151,6 +152,7 @@ sub main {
         'audit'          => \$opt_audit,
         'sbom'           => \$opt_sbom,
         'bugzilla'       => \$opt_bugzilla,
+        'junit'          => \$opt_junit,
         'verbose'        => \$opt_verbose,
         'config-file=s'  => \$opt_config_file,
         'template-dir=s' => \$opt_template_dir,
@@ -162,11 +164,12 @@ sub main {
         pod2usage(0);
     }
 
-    if ( !$opt_outdated && !$opt_audit && !$opt_sbom && !$opt_bugzilla ) {
+    if ( !$opt_outdated && !$opt_audit && !$opt_sbom && !$opt_bugzilla && !$opt_junit ) {
         $opt_outdated = 1;
         $opt_audit    = 1;
         $opt_sbom     = 1;
         $opt_bugzilla = 1;
+        $opt_junit    = 1;
     }
 
     my $script_dir   = dirname( abs_path($PROGRAM_NAME) );
@@ -258,6 +261,11 @@ sub main {
         generate_bugzilla_report( $results, $bugzilla_config );
     }
 
+    if ($opt_junit) {
+        my $junit_config = get_config()->{'junit'} // {};
+        generate_junit_output( $results, $junit_config );
+    }
+
     if ($opt_json_output) {
         write_json_results( $opt_json_output, $results, get_verbose() );
     }
@@ -298,6 +306,68 @@ sub generate_bugzilla_report {
     process_template( $template_name, $data, $output_file );
 
     log_message( 'info', get_verbose(), "Bugzilla report generated at $output_file" );
+
+    return;
+}
+
+sub generate_junit_output {
+    my ( $results, $junit_cfg ) = @_;
+
+    my $output_file = $junit_cfg->{'output_file'}
+        || 'junit_npm_audit.xml';
+
+    my $vuln_summary = $results->{'vulnerability_summary'} // {};
+    my $vulnerabilities = $results->{'vulnerabilities'} // [];
+
+    # Count totals
+    my $total_tests = 0;
+    my $failures = 0;
+    my $errors = 0;
+
+    # Count vulnerability test cases
+    my $sev_counts = $vuln_summary->{'severity_counts'} // {};
+    my $critical   = $sev_counts->{'critical'}          // 0;
+    my $high       = $sev_counts->{'high'}              // 0;
+    my $moderate   = $sev_counts->{'moderate'}          // 0;
+    my $low        = $sev_counts->{'low'}               // 0;
+
+    $total_tests += $critical + $high + $moderate + $low;
+    $failures += $critical + $high;      # Critical and high are failures
+    $errors += $moderate;                # Moderate are errors
+
+    # If no vulnerabilities, add one passing test
+    if ($total_tests == 0) {
+        $total_tests = 1;
+    }
+
+    my $timestamp = $results->{'generated_at'} // strftime( '%Y-%m-%dT%H:%M:%SZ', gmtime );
+
+    # Prepare vulnerability data for template
+    my @template_vulns = map {
+        my $cves = $_->{'cves'} // [];
+        my $cve_str = @{$cves} ? join(', ', @{$cves}) : 'No CVE';
+        {
+            'package'             => $_->{'package'} // 'unknown',
+            'severity'            => $_->{'severity'} // 'unknown',
+            'title'               => $_->{'title'} // 'Security vulnerability',
+            'cve_str'             => $cve_str,
+            'vulnerable_versions' => $_->{'vulnerable_versions'} // 'unknown',
+            'patched_versions'    => $_->{'patched_versions'} // 'none',
+        };
+    } @{$vulnerabilities};
+
+    my $data = {
+        'total_tests'     => $total_tests,
+        'failures'        => $failures,
+        'errors'          => $errors,
+        'timestamp'       => $timestamp,
+        'vulnerabilities' => \@template_vulns,
+    };
+
+    my $template_name = catfile( get_template_dir(), 'junit_audit.xml.tt' );
+    process_template( $template_name, $data, $output_file );
+
+    log_message( 'info', get_verbose(), "JUnit XML generated at $output_file" );
 
     return;
 }
@@ -370,6 +440,10 @@ Generate a CycloneDX SBOM based on package.json.
 
 Generate a Bugzilla-ready markdown summary.
 
+=item B<--junit>
+
+Generate JUnit XML test results for CI integration.
+
 =item B<--config-file FILE>
 
 Use an alternate configuration file.
@@ -399,6 +473,8 @@ The tool can emit both human-readable and machine-readable artefacts.
 =item * C<--bugzilla> renders a markdown summary (default C<dependency_bugzilla_report.md>).
 
 =item * C<--sbom> produces a CycloneDX-style XML software bill of materials (default C<node_modules_sbom.xml>).
+
+=item * C<--junit> produces a JUnit XML test report for CI systems (default C<junit_npm_audit.xml>).
 
 =back
 
@@ -523,6 +599,13 @@ Creates SBOM component hash for a package.
 =head2 generate_bugzilla_report($results, $bugzilla_config)
 
 Generates Bugzilla-ready markdown report from dependency data.
+
+=head2 generate_junit_output($results, $junit_config)
+
+Generates JUnit XML test report from vulnerability data. Critical and high
+severity vulnerabilities are mapped to test failures, moderate severity to
+errors, and low severity to passing tests with warnings. When no vulnerabilities
+are found, a single passing test is generated.
 
 =head1 INTERNAL ARCHITECTURE
 
