@@ -10,7 +10,7 @@ use File::Spec::Functions qw(catfile catdir);
 use File::Temp            qw(tempdir);
 use English               qw(-no_match_vars);
 
-my $TOOLS_REPO     = $ENV{TOOLS_REPO}     || 'https://raw.githubusercontent.com/YOUR_USERNAME/jenkins-helper-scripts/main';
+my $TOOLS_REPO     = $ENV{TOOLS_REPO}     || 'https://gitlab.com/koha-community/jenkins-helper-scripts/-/raw/main';
 my $TOOLS_DIR      = $ENV{TOOLS_DIR}      || q{};                                                                             # For local testing
 my $SYNC_REPO      = $ENV{SYNC_REPO}      || q{.};
 my $NPM_TEST_SUITE = $ENV{NPM_TEST_SUITE} || 'audit';
