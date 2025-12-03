@@ -149,16 +149,22 @@ sub run_audit_check {
             [ map { $self->_npm_node_to_path($_) } @{$nodes} ];
         my $direct = $self->_analyze_dependency_paths( $paths, $direct_deps );
 
+        my $first_via = ( ref $entry->{'via'} eq 'ARRAY' && ref $entry->{'via'}[0] eq 'HASH' )
+            ? $entry->{'via'}[0]
+            : {};
+
         push @{$vulnerabilities},
             {
-            'package'         => $module,
-            'severity'        => $severity,
-            'current_version' => $entry->{'version'} // $entry->{'range'} // 'unknown',
-            'fixed_in'        => $fixed_in,
-            'url'             => $self->_find_first_url( $entry->{'via'} ),
-            'recommendation'  => $entry->{'via'} && ref $entry->{'via'}[0] eq 'HASH'
-            ? $entry->{'via'}[0]{'recommendation'}
-            : q{},
+            'package'             => $module,
+            'severity'            => $severity,
+            'current_version'     => $entry->{'version'} // $entry->{'range'} // 'unknown',
+            'fixed_in'            => $fixed_in,
+            'patched_versions'    => $fixed_in,
+            'vulnerable_versions' => $entry->{'range'} // $first_via->{'range'} // undef,
+            'title'               => $first_via->{'title'} // undef,
+            'cves'                => $first_via->{'cves'} // [],
+            'url'                 => $self->_find_first_url( $entry->{'via'} ),
+            'recommendation'      => $first_via->{'recommendation'} // q{},
             'dependency_paths'    => $paths,
             'direct_dependencies' => $direct,
             };
