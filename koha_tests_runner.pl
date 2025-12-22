@@ -372,7 +372,7 @@ sub run_cmd {
 
 sub print_help {
     print <<'HELP';
-Usage: run_ktd_tests.pl [OPTIONS]
+Usage: koha_tests_runner.pl [OPTIONS]
 
 Runs Koha tests in an isolated KTD (Koha Testing Docker) instance.
 
@@ -432,25 +432,25 @@ ENVIRONMENT VARIABLES:
 
 EXAMPLES:
   # Run full test suite with cleanup (uses commit hash as name)
-  ./run_ktd_tests.pl
+  ./koha_tests_runner.pl
 
   # Run with a custom instance name
-  ./run_ktd_tests.pl --name my-test-run
+  ./koha_tests_runner.pl --name my-test-run
 
   # Run with verbose logging to debug startup issues
-  ./run_ktd_tests.pl --verbose
+  ./koha_tests_runner.pl --verbose
 
   # Run with Selenium support enabled
-  USE_SELENIUM=1 ./run_ktd_tests.pl
+  USE_SELENIUM=1 ./koha_tests_runner.pl
 
   # Run specific tests with coverage and custom name
-  TEST_SUITE=specific-tests TESTS_TO_RUN="t/db_dependent/api/*.t" COVERAGE=1 ./run_ktd_tests.pl --name api-tests
+  TEST_SUITE=specific-tests TESTS_TO_RUN="t/db_dependent/api/*.t" COVERAGE=1 ./koha_tests_runner.pl --name api-tests
 
   # Run with Elasticsearch 8
-  ES_FLAG=--es8 ./run_ktd_tests.pl
+  ES_FLAG=--es8 ./koha_tests_runner.pl
 
   # Run tests on a specific Koha branch with bookworm
-  KOHA_IMAGE=bookworm ./run_ktd_tests.pl
+  KOHA_IMAGE=bookworm ./koha_tests_runner.pl
 
 HELP
 }
