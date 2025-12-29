@@ -139,7 +139,6 @@ $ENV{KOHA_IMAGE}         = $ENV{KOHA_IMAGE} || 'main';
 $ENV{RUN_TESTS_AND_EXIT} = 'no';                         # We run tests manually via ktd --shell
 $ENV{TEST_SUITE}         = $ENV{TEST_SUITE}      // 'full';
 $ENV{TEST_DB_UPGRADE}    = $ENV{TEST_DB_UPGRADE} // 'no';
-$ENV{COVERAGE}           = $with_coverage ? 'yes' : 'no';
 $ENV{JUNIT_OUTPUT_FILE}  = 'junit_main.xml';
 
 # Copy defaults.env to .env
@@ -163,9 +162,11 @@ run_cmd( q{cp env/defaults.env .env}, { exit_on_error => 1, real_time => $verbos
 
 # Build environment for ktd commands
 my $ktd_env = {%ENV};
-for my $key (qw(SYNC_REPO LOCAL_USER_ID KOHA_IMAGE RUN_TESTS_AND_EXIT COVERAGE JUNIT_OUTPUT_FILE)) {
+for my $key (qw(SYNC_REPO LOCAL_USER_ID KOHA_IMAGE RUN_TESTS_AND_EXIT JUNIT_OUTPUT_FILE)) {
     delete $ktd_env->{$key} unless defined $ENV{$key} && $ENV{$key} ne '';
 }
+# Don't pass COVERAGE environment variable - use --with-coverage parameter instead
+delete $ktd_env->{COVERAGE};
 
 # Determine ktd flags needed
 my @ktd_flags = (
@@ -371,7 +372,7 @@ sub build_test_command {
         push @cmd_parts, '--compare-with', $compare_with;
     }
 
-    # Add coverage if requested via CLI or ENV
+    # Add coverage if requested via CLI (pass-through parameter, not environment)
     if ($with_coverage) {
         push @cmd_parts, '--with-coverage';
     }
