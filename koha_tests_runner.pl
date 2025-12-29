@@ -48,6 +48,7 @@ my $verbose = 0;
 my $warmup_timeout = 300;  # Default warmup timeout in seconds
 my $force_cleanup = 0;     # Force cleanup of existing instances
 my $selenium = 0;          # Enable selenium support
+my $search_engine = '';    # Search engine to use (zebra, es6, es7, es8, os1, os2)
 
 # Test control options (from run_tests.pl)
 my $run_all_tests           = 0;
@@ -72,6 +73,7 @@ GetOptions(
     'warmup-timeout=i' => \$warmup_timeout,
     'force-cleanup'    => \$force_cleanup,
     'selenium'         => \$selenium,
+    'search-engine=s'  => \$search_engine,
 
     # Test control options (from run_tests.pl)
     'prove-cpus=s'            => \$prove_cpus,
@@ -184,10 +186,15 @@ if (   $run_all_tests || $run_all_perl_tests || $run_selenium_tests_only || $run
 }
 
 # Elasticsearch/OpenSearch support
-if ( $ENV{ES_FLAG} ) {
-    my $es_flag = $ENV{ES_FLAG};
-    push @ktd_flags, $es_flag;
+if (!$search_engine) {
+    # Auto-detect based on test switches that require Elasticsearch
+    if ($run_all_tests || $run_all_perl_tests || $run_elastic_tests_only) {
+        $search_engine = 'es8';  # Default to es8
+    } else {
+        $search_engine = 'zebra';  # Default to zebra for other tests
+    }
 }
+push @ktd_flags, "--search-engine", $search_engine;
 
 my $ktd_flags = join( ' ', @ktd_flags );
 
@@ -408,6 +415,11 @@ OPTIONS:
       Name for the KTD instance. If not provided, uses the short commit hash
       from the current git repository.
 
+  --search-engine <engine>
+      Search engine to use: zebra, es7, es8, os1, os2 (default: zebra, falls back to es8 when ES required)
+      Falls back to es8 for tests requiring Elasticsearch, zebra otherwise.
+      Run 'ktd --search-engine list' to see all available options.
+
   --selenium
       Enable Selenium support for browser-based tests.
 
@@ -451,8 +463,6 @@ ENVIRONMENT VARIABLES:
   KOHA_IMAGE        Koha docker image tag (default: 'main')
   KTD_BRANCH        KTD branch to use (default: 'main')
   SYNC_REPO         Path to Koha repository (default: current directory)
-  ES_FLAG           Elasticsearch/OpenSearch flag (optional)
-                    Options: --es6, --es7, --es8, --os1, --os2
 
 EXAMPLES:
   # Run full test suite with cleanup (uses commit hash as name)
@@ -467,8 +477,8 @@ EXAMPLES:
   # Run with Selenium support enabled
   ./koha_tests_runner.pl --selenium
 
-  # Run with Elasticsearch 8
-  ES_FLAG=--es8 ./koha_tests_runner.pl
+  # Run with specific search engine
+  ./koha_tests_runner.pl --search-engine es8
 
   # Run tests on a specific Koha branch with bookworm
   KOHA_IMAGE=bookworm ./koha_tests_runner.pl
