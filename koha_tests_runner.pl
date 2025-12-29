@@ -47,6 +47,7 @@ my $name    = '';
 my $verbose = 0;
 my $warmup_timeout = 300;  # Default warmup timeout in seconds
 my $force_cleanup = 0;     # Force cleanup of existing instances
+my $selenium = 0;          # Enable selenium support
 
 # Test control options (from run_tests.pl)
 my $run_all_tests           = 0;
@@ -70,6 +71,7 @@ GetOptions(
     'verbose|v'        => \$verbose,
     'warmup-timeout=i' => \$warmup_timeout,
     'force-cleanup'    => \$force_cleanup,
+    'selenium'         => \$selenium,
 
     # Test control options (from run_tests.pl)
     'prove-cpus=s'            => \$prove_cpus,
@@ -137,8 +139,6 @@ $ENV{LOCAL_USER_ID} = qx{id -u};
 chomp $ENV{LOCAL_USER_ID};
 $ENV{KOHA_IMAGE}         = $ENV{KOHA_IMAGE} || 'main';
 $ENV{RUN_TESTS_AND_EXIT} = 'no';                         # We run tests manually via ktd --shell
-$ENV{TEST_SUITE}         = $ENV{TEST_SUITE}      // 'full';
-$ENV{TEST_DB_UPGRADE}    = $ENV{TEST_DB_UPGRADE} // 'no';
 $ENV{JUNIT_OUTPUT_FILE}  = 'junit_main.xml';
 
 # Copy defaults.env to .env
@@ -178,16 +178,14 @@ my @ktd_flags = (
 check_and_cleanup_existing_instance($ktd_home, $instance_name, $force_cleanup);
 
 # Selenium support
-if (   ($ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'full')
-    || ($ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'selenium-only')
-    || ( $ENV{USE_SELENIUM} && $ENV{USE_SELENIUM} eq 'yes' ) )
+if (   $run_all_tests || $run_all_perl_tests || $run_selenium_tests_only || $run_only || $selenium )
 {
     push @ktd_flags, '--selenium';
 }
 
 # Elasticsearch/OpenSearch support
-if ( $ENV{TEST_SUITE} eq 'full' || $ENV{TEST_SUITE} eq 'es-only' || $ENV{ES_FLAG} ) {
-    my $es_flag = $ENV{ES_FLAG} || '--es7';
+if ( $ENV{ES_FLAG} ) {
+    my $es_flag = $ENV{ES_FLAG};
     push @ktd_flags, $es_flag;
 }
 
@@ -350,17 +348,8 @@ sub build_test_command {
         push @cmd_parts, '--run-db-upgrade-only';
     } elsif ($run_db_compare_only) {
         push @cmd_parts, '--run-db-compare-only';
-    } elsif ( $ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'light' ) {
-        push @cmd_parts, '--run-light-tests';
-    } elsif ( $ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'selenium-only' ) {
-        push @cmd_parts, '--run-selenium-tests-only';
-    } elsif ( $ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'cypress-only' ) {
-        push @cmd_parts, '--run-cypress-tests-only';
-    } elsif ( $ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'es-only' ) {
-        push @cmd_parts, '--run-elastic-tests-only';
     } else {
-
-        # Default: run all tests (equivalent to TEST_SUITE=full)
+        # Default: run all tests
         push @cmd_parts, '--run-all-tests';
     }
 
@@ -419,6 +408,9 @@ OPTIONS:
       Name for the KTD instance. If not provided, uses the short commit hash
       from the current git repository.
 
+  --selenium
+      Enable Selenium support for browser-based tests.
+
   --force-cleanup
       Clean up any existing KTD instance with the same name before starting.
       Without this flag, the script will exit if an instance already exists.
@@ -456,14 +448,9 @@ TEST CONTROL OPTIONS:
       Show this help message.
 
 ENVIRONMENT VARIABLES:
-  TEST_SUITE        Test suite to run if no CLI option specified (default: 'full')
-                    Options: full, light, selenium-only, cypress-only, es-only
-  TEST_DB_UPGRADE   Run database upgrade tests (default: 'no')
-  COVERAGE          Enable coverage reporting (default: 'no')
   KOHA_IMAGE        Koha docker image tag (default: 'main')
   KTD_BRANCH        KTD branch to use (default: 'main')
   SYNC_REPO         Path to Koha repository (default: current directory)
-  USE_SELENIUM      Set to 1 to enable Selenium support (not enabled by default)
   ES_FLAG           Elasticsearch/OpenSearch flag (optional)
                     Options: --es6, --es7, --es8, --os1, --os2
 
@@ -478,10 +465,7 @@ EXAMPLES:
   ./koha_tests_runner.pl --verbose
 
   # Run with Selenium support enabled
-  USE_SELENIUM=1 ./koha_tests_runner.pl
-
-  # Run specific tests with coverage and custom name
-  TEST_SUITE=specific-tests TESTS_TO_RUN="t/db_dependent/api/*.t" COVERAGE=1 ./koha_tests_runner.pl --name api-tests
+  ./koha_tests_runner.pl --selenium
 
   # Run with Elasticsearch 8
   ES_FLAG=--es8 ./koha_tests_runner.pl
