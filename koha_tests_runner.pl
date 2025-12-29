@@ -46,6 +46,7 @@ my $help    = 0;
 my $name    = '';
 my $verbose = 0;
 my $warmup_timeout = 300;  # Default warmup timeout in seconds
+my $force_cleanup = 0;     # Force cleanup of existing instances
 
 # Test control options (from run_tests.pl)
 my $run_all_tests           = 0;
@@ -68,6 +69,7 @@ GetOptions(
     'name=s'           => \$name,
     'verbose|v'        => \$verbose,
     'warmup-timeout=i' => \$warmup_timeout,
+    'force-cleanup'    => \$force_cleanup,
 
     # Test control options (from run_tests.pl)
     'prove-cpus=s'            => \$prove_cpus,
@@ -171,6 +173,9 @@ my @ktd_flags = (
     '--name', $instance_name
 );
 
+# Check for existing instance and clean up if needed
+check_and_cleanup_existing_instance($ktd_home, $instance_name, $force_cleanup);
+
 # Selenium support
 if (   ($ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'full')
     || ($ENV{TEST_SUITE} && $ENV{TEST_SUITE} eq 'selenium-only')
@@ -249,6 +254,28 @@ if ($cleanup) {
 exit $test_exit_code;
 
 # Subroutines
+
+sub check_and_cleanup_existing_instance {
+    my ($ktd_home, $instance_name, $force_cleanup) = @_;
+    
+    # Check if instance exists
+    my $check_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && docker compose -p $instance_name ps -q";
+    my ($success, $error_message, $full_buf, $stdout_buf, $stderr_buf) = IPC::Cmd::run(
+        command => $check_cmd,
+        verbose => 0,
+    );
+    
+    if ($success && $stdout_buf && @$stdout_buf) {
+        # Instance exists
+        if ($force_cleanup) {
+            print "Found existing instance '$instance_name', cleaning up...\n";
+            my $cleanup_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name down";
+            run_cmd($cleanup_cmd, { real_time => 0 });
+        } else {
+            die "Instance '$instance_name' already exists. Use --force-cleanup to remove it first.\n";
+        }
+    }
+}
 
 sub wait_ready_with_logs {
     my ( $ktd_home, $instance_name, $log_file, $timeout ) = @_;
@@ -390,6 +417,10 @@ OPTIONS:
   --name <name>
       Name for the KTD instance. If not provided, uses the short commit hash
       from the current git repository.
+
+  --force-cleanup
+      Clean up any existing KTD instance with the same name before starting.
+      Without this flag, the script will exit if an instance already exists.
 
   --warmup-timeout <seconds>
       Timeout in seconds to wait for KTD instance to be ready (default: 300).
