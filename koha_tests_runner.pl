@@ -45,6 +45,7 @@ my $cleanup = 1;    # Default to cleanup
 my $help    = 0;
 my $name    = '';
 my $verbose = 0;
+my $warmup_timeout = 300;  # Default warmup timeout in seconds
 
 # Test control options (from run_tests.pl)
 my $run_all_tests           = 0;
@@ -62,10 +63,11 @@ my $run_only                = '';
 my $with_coverage           = 0;
 
 GetOptions(
-    'cleanup!'  => \$cleanup,
-    'help|h'    => \$help,
-    'name=s'    => \$name,
-    'verbose|v' => \$verbose,
+    'cleanup!'         => \$cleanup,
+    'help|h'           => \$help,
+    'name=s'           => \$name,
+    'verbose|v'        => \$verbose,
+    'warmup-timeout=i' => \$warmup_timeout,
 
     # Test control options (from run_tests.pl)
     'prove-cpus=s'            => \$prove_cpus,
@@ -206,8 +208,8 @@ my $ktd_up_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH
 run_cmd( $ktd_up_cmd, { exit_on_error => 1, real_time => $verbose, env => $ktd_env } );
 
 # Wait for KTD to be ready while capturing logs
-print "Waiting for KTD instance to be ready (timeout: 300s)...\n";
-wait_ready_with_logs( $ktd_home, $instance_name, $log_file, 300 );
+print "Waiting for KTD instance to be ready (timeout: ${warmup_timeout}s)...\n";
+wait_ready_with_logs( $ktd_home, $instance_name, $log_file, $warmup_timeout );
 
 # Build test command based on TEST_SUITE
 my $test_cmd = build_test_command();
@@ -388,6 +390,9 @@ OPTIONS:
   --name <name>
       Name for the KTD instance. If not provided, uses the short commit hash
       from the current git repository.
+
+  --warmup-timeout <seconds>
+      Timeout in seconds to wait for KTD instance to be ready (default: 300).
 
   --cleanup / --no-cleanup
       Whether to cleanup the KTD instance and temp directory after running.
