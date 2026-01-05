@@ -215,6 +215,11 @@ if ($ktd_flags =~ /--proxy/) {
     }
 }
 
+# Pull images quietly before launching
+print "Pulling docker images...\n";
+my $ktd_pull_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd $ktd_flags pull -q";
+run_cmd( $ktd_pull_cmd, { exit_on_error => 1, real_time => 0, env => $ktd_env } );
+
 my $ktd_up_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd $ktd_flags up -d";
 run_cmd( $ktd_up_cmd, { exit_on_error => 1, real_time => $verbose, env => $ktd_env } );
 
