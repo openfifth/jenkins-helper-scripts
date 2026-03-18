@@ -28,7 +28,8 @@ BEGIN {
 
     if (@missing) {
         print "Installing missing Perl modules: " . join( ', ', @missing ) . "\n";
-        system( 'cpan', '-i', @missing ) == 0 or die "Failed to install modules: $!\n";
+        system( 'cpan', '-i', @missing ) == 0
+            or die "Failed to install modules: $!\n";
         exec( $^X, $0, @ARGV );    # Re-exec script with new modules
     }
 }
@@ -41,14 +42,15 @@ use Cwd      qw(abs_path getcwd);
 use IPC::Cmd qw(run run_forked);
 
 # Parse command line options
-my $cleanup = 1;    # Default to cleanup
-my $help    = 0;
-my $name    = '';
-my $verbose = 0;
-my $warmup_timeout = 300;  # Default warmup timeout in seconds
-my $force_cleanup = 0;     # Force cleanup of existing instances
-my $selenium = 0;          # Enable selenium support
-my $search_engine = '';    # Search engine to use (zebra, es6, es7, es8, os1, os2)
+my $cleanup        = 1;        # Default to cleanup
+my $help           = 0;
+my $name           = '';
+my $verbose        = 0;
+my $warmup_timeout = 300;      # Default warmup timeout in seconds
+my $force_cleanup  = 0;        # Force cleanup of existing instances
+my $initial_docker_cleanup;    # Docker cleanup mode: undef, '', 'full', or 'Nd'
+my $selenium      = 0;         # Enable selenium support
+my $search_engine = '';        # Search engine to use (zebra, es6, es7, es8, os1, os2)
 
 # Test control options (from run_tests.pl)
 my $run_all_tests           = 0;
@@ -66,14 +68,15 @@ my $run_only                = '';
 my $with_coverage           = 0;
 
 GetOptions(
-    'cleanup!'         => \$cleanup,
-    'help|h'           => \$help,
-    'name=s'           => \$name,
-    'verbose|v'        => \$verbose,
-    'warmup-timeout=i' => \$warmup_timeout,
-    'force-cleanup'    => \$force_cleanup,
-    'selenium'         => \$selenium,
-    'search-engine=s'  => \$search_engine,
+    'cleanup!'                 => \$cleanup,
+    'help|h'                   => \$help,
+    'name=s'                   => \$name,
+    'verbose|v'                => \$verbose,
+    'warmup-timeout=i'         => \$warmup_timeout,
+    'force-cleanup'            => \$force_cleanup,
+    'initial-docker-cleanup:s' => \$initial_docker_cleanup,
+    'selenium'                 => \$selenium,
+    'search-engine=s'          => \$search_engine,
 
     # Test control options (from run_tests.pl)
     'prove-cpus=s'            => \$prove_cpus,
@@ -91,7 +94,7 @@ GetOptions(
     'run-only=s'              => \$run_only,
 ) or die "Error in command line arguments\n";
 
-$with_coverage ||= ($ENV{COVERAGE} && $ENV{COVERAGE} eq 'yes');
+$with_coverage ||= ( $ENV{COVERAGE} && $ENV{COVERAGE} eq 'yes' );
 
 if ($help) {
     print_help();
@@ -111,7 +114,8 @@ if ($name) {
     # Get short commit hash for naming the KTD instance
     $instance_name = qx{git rev-parse --short HEAD};
     chomp $instance_name;
-    die "Failed to get commit hash. Are you in a git repository?\n" unless $instance_name;
+    die "Failed to get commit hash. Are you in a git repository?\n"
+        unless $instance_name;
     print "Using commit hash: $instance_name for KTD instance name\n";
 }
 
@@ -123,6 +127,39 @@ print "Created temporary directory: $tmp_dir\n";
 my $original_dir = getcwd();
 
 # Clone KTD into temp directory
+if ( defined $initial_docker_cleanup && $initial_docker_cleanup ne '' ) {
+    if ( $initial_docker_cleanup eq 'full' ) {
+        print "Running full Docker cleanup...\n";
+        run_cmd(
+            "docker system prune -a -f --volumes",
+            { exit_on_error => 1, real_time => $verbose }
+        );
+    } elsif ( $initial_docker_cleanup =~ /^(\d+)d$/ ) {
+        print "Removing Docker images older than $1 days...\n";
+        run_cmd(
+            "docker image prune -a -f --filter until=${1}d",
+            { exit_on_error => 0, real_time => $verbose }
+        );
+    } else {
+        die "Invalid --initial-docker-cleanup value '$initial_docker_cleanup'. Use 'full' or 'Nd' (e.g. '7d')\n";
+    }
+} elsif ( defined $initial_docker_cleanup ) {
+
+    # Flag passed without value: dangling images + volumes + networks
+    print "Running Docker cleanup (dangling images, unused volumes and networks)...\n";
+    run_cmd(
+        "docker image prune -f",
+        { exit_on_error => 0, real_time => $verbose }
+    );
+    run_cmd(
+        "docker volume prune -f",
+        { exit_on_error => 0, real_time => $verbose }
+    );
+    run_cmd(
+        "docker network prune -f",
+        { exit_on_error => 0, real_time => $verbose }
+    );
+}
 print "Cloning koha-testing-docker...\n";
 my $ktd_branch = $ENV{KTD_BRANCH} || 'main';
 chdir($tmp_dir) or die "Cannot chdir to $tmp_dir: $!";
@@ -144,17 +181,20 @@ $ENV{RUN_TESTS_AND_EXIT} = 'no';                         # We run tests manually
 $ENV{JUNIT_OUTPUT_FILE}  = 'junit_main.xml';
 
 # Copy defaults.env to .env
-run_cmd( q{cp env/defaults.env .env}, { exit_on_error => 1, real_time => $verbose } );
+run_cmd(
+    q{cp env/defaults.env .env},
+    { exit_on_error => 1, real_time => $verbose }
+);
 
 # TODO: Rethink if we need to patch .env file with current environment variables
 # or if ktd's environment variable override logic is sufficient.
 {
     local @ARGV = ('.env');
-    local $^I = '';  # in-place editing
+    local $^I   = '';         # in-place editing
     while (<>) {
         if (/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/) {
-            my ($key, $val) = ($1, $2);
-            if (exists $ENV{$key}) {
+            my ( $key, $val ) = ( $1, $2 );
+            if ( exists $ENV{$key} ) {
                 $_ = "$key=$ENV{$key}\n";
             }
         }
@@ -167,6 +207,7 @@ my $ktd_env = {%ENV};
 for my $key (qw(SYNC_REPO LOCAL_USER_ID KOHA_IMAGE RUN_TESTS_AND_EXIT JUNIT_OUTPUT_FILE)) {
     delete $ktd_env->{$key} unless defined $ENV{$key} && $ENV{$key} ne '';
 }
+
 # Don't pass COVERAGE environment variable - use --with-coverage parameter instead
 delete $ktd_env->{COVERAGE};
 
@@ -177,21 +218,29 @@ my @ktd_flags = (
 );
 
 # Check for existing instance and clean up if needed
-check_and_cleanup_existing_instance($ktd_home, $instance_name, $force_cleanup);
+check_and_cleanup_existing_instance(
+    $ktd_home, $instance_name,
+    $force_cleanup
+);
 
 # Selenium support
-if (   $run_all_tests || $run_all_perl_tests || $run_selenium_tests_only || $run_only || $selenium )
+if (   $run_all_tests
+    || $run_all_perl_tests
+    || $run_selenium_tests_only
+    || $run_only
+    || $selenium )
 {
     push @ktd_flags, '--selenium';
 }
 
 # Elasticsearch/OpenSearch support
-if (!$search_engine) {
+if ( !$search_engine ) {
+
     # Auto-detect based on test switches that require Elasticsearch
-    if ($run_all_tests || $run_all_perl_tests || $run_elastic_tests_only) {
-        $search_engine = 'es8';  # Default to es8
+    if ( $run_all_tests || $run_all_perl_tests || $run_elastic_tests_only ) {
+        $search_engine = 'es8';    # Default to es8
     } else {
-        $search_engine = 'zebra';  # Default to zebra for other tests
+        $search_engine = 'zebra';    # Default to zebra for other tests
     }
 }
 push @ktd_flags, "--search-engine", $search_engine;
@@ -206,22 +255,31 @@ print "Storing KTD logs to: $log_file\n";
 print "Launching KTD instance '$instance_name' with flags: $ktd_flags\n";
 
 # Ensure proxy network exists for --proxy flag
-if ($ktd_flags =~ /--proxy/) {
+if ( $ktd_flags =~ /--proxy/ ) {
     print "Checking for proxy network...\n";
     my $network_check = `docker network ls | grep -e '\\sproxy\\s'`;
-    if (!$network_check) {
+    if ( !$network_check ) {
         print "Creating proxy network...\n";
-        run_cmd("docker network create proxy", { exit_on_error => 1, real_time => $verbose });
+        run_cmd(
+            "docker network create proxy",
+            { exit_on_error => 1, real_time => $verbose }
+        );
     }
 }
 
 # Pull images quietly before launching
 print "Pulling docker images...\n";
 my $ktd_pull_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd $ktd_flags pull -q";
-run_cmd( $ktd_pull_cmd, { exit_on_error => 1, real_time => 0, env => $ktd_env } );
+run_cmd(
+    $ktd_pull_cmd,
+    { exit_on_error => 1, real_time => 0, env => $ktd_env }
+);
 
 my $ktd_up_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd $ktd_flags up -d";
-run_cmd( $ktd_up_cmd, { exit_on_error => 1, real_time => $verbose, env => $ktd_env } );
+run_cmd(
+    $ktd_up_cmd,
+    { exit_on_error => 1, real_time => $verbose, env => $ktd_env }
+);
 
 # Wait for KTD to be ready while capturing logs
 print "Waiting for KTD instance to be ready (timeout: ${warmup_timeout}s)...\n";
@@ -246,7 +304,10 @@ if ($@) {
 # Cleanup
 if ($cleanup) {
     print "Cleaning up KTD instance...\n";
-    run_cmd( "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name down", { real_time => $verbose, env => $ktd_env } );
+    run_cmd(
+        "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name down",
+        { real_time => $verbose, env => $ktd_env }
+    );
     print "Restoring original directory...\n";
     chdir($original_dir) or warn "Cannot chdir back to $original_dir: $!";
     print "Temporary directory will be cleaned up automatically.\n";
@@ -267,21 +328,24 @@ exit $test_exit_code;
 # Subroutines
 
 sub check_and_cleanup_existing_instance {
-    my ($ktd_home, $instance_name, $force_cleanup) = @_;
-    
+    my ( $ktd_home, $instance_name, $force_cleanup ) = @_;
+
     # Check if instance exists
-    my $check_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && docker compose -p $instance_name ps -q";
-    my ($success, $error_message, $full_buf, $stdout_buf, $stderr_buf) = IPC::Cmd::run(
+    my $check_cmd =
+        "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && docker compose -p $instance_name ps -q";
+    my ( $success, $error_message, $full_buf, $stdout_buf, $stderr_buf ) = IPC::Cmd::run(
         command => $check_cmd,
         verbose => 0,
     );
-    
-    if ($success && $stdout_buf && @$stdout_buf) {
+
+    if ( $success && $stdout_buf && @$stdout_buf ) {
+
         # Instance exists
         if ($force_cleanup) {
             print "Found existing instance '$instance_name', cleaning up...\n";
-            my $cleanup_cmd = "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name down";
-            run_cmd($cleanup_cmd, { real_time => 0 });
+            my $cleanup_cmd =
+                "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name down";
+            run_cmd( $cleanup_cmd, { real_time => 0 } );
         } else {
             die "Instance '$instance_name' already exists. Use --force-cleanup to remove it first.\n";
         }
@@ -317,7 +381,8 @@ sub wait_ready_with_logs {
 
     # Single wait-ready call handles all timing logic
     my ($ready) = IPC::Cmd::run(
-        command => "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name --wait-ready $timeout",
+        command =>
+            "export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name --wait-ready $timeout",
         verbose => 0,
         timeout => $timeout + 5,    # Add buffer for command execution
     );
@@ -361,6 +426,7 @@ sub build_test_command {
     } elsif ($run_db_compare_only) {
         push @cmd_parts, '--run-db-compare-only';
     } else {
+
         # Default: run all tests
         push @cmd_parts, '--run-all-tests';
     }
@@ -431,6 +497,12 @@ OPTIONS:
   --force-cleanup
       Clean up any existing KTD instance with the same name before starting.
       Without this flag, the script will exit if an instance already exists.
+
+  --initial-docker-cleanup[=MODE]
+      Clean up Docker resources before starting. Modes:
+        (no value)  Remove dangling images, unused volumes and networks (safe)
+        full        Run 'docker system prune -a -f --volumes' (removes everything)
+        Nd          Remove images older than N days (e.g. 7d)
 
   --warmup-timeout <seconds>
       Timeout in seconds to wait for KTD instance to be ready (default: 300).
