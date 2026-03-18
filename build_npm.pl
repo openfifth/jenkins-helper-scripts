@@ -45,6 +45,7 @@ else {
         'node-audit-tools/lib/Node/Utils.pm',                'node-audit-tools/lib/Node/Package/Manager/Base.pm',
         'node-audit-tools/lib/Node/Package/Manager/Npm.pm',  'node-audit-tools/lib/Node/Package/Manager/Yarn.pm',
         'node-audit-tools/templates/dependency_sbom.xml.tt', 'node-audit-tools/templates/dependency_bugzilla_report.md.tt',
+        'node-audit-tools/templates/junit_audit.xml.tt',
     );
 
     for my $file (@files_to_download) {
