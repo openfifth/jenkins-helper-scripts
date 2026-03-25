@@ -456,7 +456,7 @@ sub run_cmd {
     my ( $success, $error_message, $full_buf, $stdout_buf, $stderr_buf ) = IPC::Cmd::run(
         command => $cmd,
         verbose => $real_time,
-        timeout => 10800,        # 3 hour timeout for full test suite
+        timeout => 4 * 3600,        # 4 hour timeout for full test suite
         %$env ? ( env => $env ) : (),
     );
 
