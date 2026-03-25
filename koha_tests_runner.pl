@@ -461,6 +461,7 @@ sub run_cmd {
     );
 
     if ( !$success && $exit_on_error ) {
+        check_and_cleanup_existing_instance( $ktd_home, $instance_name, 1 );
         die "Command failed: $error_message\n";
     }
 
