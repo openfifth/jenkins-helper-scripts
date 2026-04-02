@@ -307,23 +307,22 @@ print "---\n\n";
 
 print "Running tests: $test_cmd\n";
 my $test_exit_code = 0;
-eval {
-    run_cmd(
-        qq{export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name --shell --run "source ~/.bashrc && $test_cmd"},
-        { exit_on_error => 1, real_time => 1, env => $ktd_env }
-    );
-};
-if ($@) {
-    my $err = $@;
-    if ( $err =~ /timed out/i ) {
-        print "\n--- Test execution timed out ---\n";
-        print "Reason: $err";
+{
+    # Use system() instead of IPC::Cmd::run to avoid buffering all test output
+    # in memory. For multi-hour test runs this can be hundreds of MB.
+    my $full_cmd = qq{export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name --shell --run "source ~/.bashrc && $test_cmd"};
+    my $rc = system($full_cmd);
+    if ( $rc != 0 ) {
+        if ( $rc == -1 ) {
+            print "Failed to execute: $!\n";
+        } elsif ( $rc & 127 ) {
+            printf "Process killed by signal %d\n", ( $rc & 127 );
+        } else {
+            printf "Process exited with value %d\n", ( $rc >> 8 );
+        }
         dump_container_diagnostics($instance_name);
-    } else {
-        print "Tests failed: $err";
-        dump_container_diagnostics($instance_name);
+        $test_exit_code = 1;
     }
-    $test_exit_code = 1;
 }
 
 # Cleanup
