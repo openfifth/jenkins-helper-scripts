@@ -94,7 +94,12 @@ GetOptions(
     'run-only=s'              => \$run_only,
 ) or die "Error in command line arguments\n";
 
-$with_coverage ||= ( $ENV{COVERAGE} && $ENV{COVERAGE} eq 'yes' );
+# Support COVERAGE env var for Jenkins parameterized builds
+if ( !$with_coverage && $ENV{COVERAGE} && $ENV{COVERAGE} eq 'yes' ) {
+    $with_coverage = 1;
+    print "Coverage enabled (via COVERAGE env var)\n";
+}
+delete $ENV{COVERAGE};
 
 if ($help) {
     print_help();
