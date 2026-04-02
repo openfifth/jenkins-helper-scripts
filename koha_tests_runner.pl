@@ -288,6 +288,18 @@ wait_ready_with_logs( $ktd_home, $instance_name, $log_file, $warmup_timeout );
 # Build test command based on TEST_SUITE
 my $test_cmd = build_test_command();
 
+print "\n--- Run configuration ---\n";
+print "instance:      $instance_name\n";
+print "koha_image:    $ENV{KOHA_IMAGE}\n";
+print "search_engine: $search_engine\n";
+print "selenium:      " . ( $selenium ? 'true' : 'false' ) . "\n";
+print "coverage:      " . ( $with_coverage ? 'true' : 'false' ) . "\n";
+print "prove_cpus:    " . ( $prove_cpus || 'auto' ) . "\n";
+print "sync_repo:     $ENV{SYNC_REPO}\n";
+print "ktd_branch:    $ktd_branch\n";
+print "command:       $test_cmd\n";
+print "---\n\n";
+
 print "Running tests: $test_cmd\n";
 my $test_exit_code = 0;
 eval {
@@ -297,7 +309,15 @@ eval {
     );
 };
 if ($@) {
-    print "Tests failed!\n";
+    my $err = $@;
+    if ( $err =~ /timed out/i ) {
+        print "\n--- Test execution timed out ---\n";
+        print "Reason: $err";
+        dump_container_diagnostics($instance_name);
+    } else {
+        print "Tests failed: $err";
+        dump_container_diagnostics($instance_name);
+    }
     $test_exit_code = 1;
 }
 
@@ -396,6 +416,8 @@ sub wait_ready_with_logs {
         my $elapsed = time - $start_time;
         print "\nKTD instance ready after ${elapsed}s!\n";
     } else {
+        print "\n--- KTD instance failed to become ready ---\n";
+        dump_container_diagnostics($instance_name);
         die "\nTimeout waiting for KTD instance to be ready after ${timeout}s\n";
     }
 }
@@ -461,11 +483,54 @@ sub run_cmd {
     );
 
     if ( !$success && $exit_on_error ) {
+        # Print tail of captured output for context
+        if ( $stderr_buf && @$stderr_buf ) {
+            my $tail = join( '', @$stderr_buf );
+            my @lines = split /\n/, $tail;
+            @lines = @lines[ -20 .. -1 ] if @lines > 20;
+            print STDERR "--- Last stderr output ---\n" . join( "\n", @lines ) . "\n---\n";
+        }
         check_and_cleanup_existing_instance( $ktd_home, $instance_name, 1 );
         die "Command failed: $error_message\n";
     }
 
     return $success;
+}
+
+sub dump_container_diagnostics {
+    my ($instance_name) = @_;
+
+    my $container = "${instance_name}-koha-1";
+
+    # Check if container is still running
+    my $state = qx{docker inspect --format '{{.State.Status}}' $container 2>/dev/null};
+    chomp $state;
+
+    if ( !$state ) {
+        print "Container $container not found\n";
+        return;
+    }
+
+    print "Container status: $state\n";
+
+    if ( $state eq 'exited' || $state eq 'dead' ) {
+        my $exit_code = qx{docker inspect --format '{{.State.ExitCode}}' $container 2>/dev/null};
+        chomp $exit_code;
+        print "Exit code: $exit_code\n";
+
+        my $oom = qx{docker inspect --format '{{.State.OOMKilled}}' $container 2>/dev/null};
+        chomp $oom;
+        print "OOM killed: $oom\n" if $oom eq 'true';
+
+        my $finished = qx{docker inspect --format '{{.State.FinishedAt}}' $container 2>/dev/null};
+        chomp $finished;
+        print "Finished at: $finished\n";
+    }
+
+    # Last 30 lines of container logs
+    print "--- Last 30 lines of container logs ---\n";
+    system("docker logs --tail 30 $container 2>&1");
+    print "--- End of container logs ---\n";
 }
 
 sub print_help {
