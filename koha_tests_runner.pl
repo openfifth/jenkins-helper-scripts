@@ -321,7 +321,24 @@ my $test_exit_code = 0;
             printf "Process exited with value %d\n", ( $rc >> 8 );
         }
         dump_container_diagnostics($instance_name);
-        $test_exit_code = 1;
+
+        # Check if JUnit results exist (bind-mounted SYNC_REPO = workspace)
+        my @expected_patterns = expected_junit_patterns();
+        my @found = expected_junit_files($koha_repo);
+        my @missing = missing_junit_patterns($koha_repo);
+        if ( @found && !@missing ) {
+            print "Tests produced results but exited non-zero. Deferring to JUnit publisher.\n";
+            print "  Found: " . join( ', ', map { s|.*/||r } @found ) . "\n";
+        } elsif (@found) {
+            print "PARTIAL FAILURE: Some expected JUnit results are missing.\n";
+            print "  Found:   " . join( ', ', map { s|.*/||r } @found ) . "\n";
+            print "  Missing: " . join( ', ', @missing ) . "\n";
+            $test_exit_code = 1;
+        } else {
+            print "FATAL: No JUnit results found. Infrastructure or execution failure.\n";
+            print "  Expected: " . join( ', ', @expected_patterns ) . "\n" if @expected_patterns;
+            $test_exit_code = 1;
+        }
     }
 }
 
@@ -499,6 +516,42 @@ sub run_cmd {
     }
 
     return $success;
+}
+
+
+# Expected JUnit files per test mode:
+#   --run-all-tests          => junit_main.xml + junit-cypress-*.xml
+#   --run-all-perl-tests     => junit_main.xml
+#   --run-light-test-suite   => junit_main.xml
+#   --run-elastic-tests-only => junit_main.xml
+#   --run-selenium-tests-only=> junit_main.xml
+#   --run-cypress-tests-only => junit-cypress-*.xml
+#   --run-only (perl)        => junit_main.xml
+#   --run-only (cypress)     => junit_main.xml + junit-cypress-*.xml
+#   --run-db-upgrade-only    => (none)
+#   --run-db-compare-only    => junit-db-compare.xml
+sub expected_junit_patterns {
+    if ($run_db_upgrade_only) {
+        return ();
+    } elsif ($run_db_compare_only) {
+        return ('junit-db-compare.xml');
+    } elsif ($run_cypress_tests_only) {
+        return ('junit-cypress-*.xml');
+    } elsif ($run_all_tests || ( $run_only && $run_only =~ /\.ts$/ )) {
+        return ( 'junit_main.xml', 'junit-cypress-*.xml' );
+    } else {
+        return ('junit_main.xml');
+    }
+}
+
+sub expected_junit_files {
+    my ($repo_dir) = @_;
+    return grep { -f $_ } map { glob("$repo_dir/$_") } expected_junit_patterns();
+}
+
+sub missing_junit_patterns {
+    my ($repo_dir) = @_;
+    return grep { !glob("$repo_dir/$_") } expected_junit_patterns();
 }
 
 sub dump_container_diagnostics {
