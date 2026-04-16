@@ -290,7 +290,7 @@ run_cmd(
 print "Waiting for KTD instance to be ready (timeout: ${warmup_timeout}s)...\n";
 wait_ready_with_logs( $ktd_home, $instance_name, $log_file, $warmup_timeout );
 
-# Build test command based on TEST_SUITE
+# Build test command based on the run-* option
 my $test_cmd = build_test_command();
 
 print "\n--- Run configuration ---\n";
