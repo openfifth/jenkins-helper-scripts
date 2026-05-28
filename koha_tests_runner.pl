@@ -328,19 +328,27 @@ print "command:       $test_cmd\n";
 print "---\n\n";
 
 print "Running tests: $test_cmd\n";
-my $test_exit_code = 0;
+my $rc  = -1;
+my $sig = 0;
 {
     # Use system() instead of IPC::Cmd::run to avoid buffering all test output
     # in memory. For multi-hour test runs this can be hundreds of MB.
-    my $full_cmd = qq{export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name --shell --run "source ~/.bashrc && $test_cmd"};
-    my $rc = system($full_cmd);
-    if ( $rc != 0 ) {
-        if ( $rc == -1 ) {
-            print "Failed to execute: $!\n";
-        } elsif ( $rc & 127 ) {
-            printf "Process killed by signal %d\n", ( $rc & 127 );
-        } else {
-            printf "Process exited with value %d\n", ( $rc >> 8 );
+    my $full_cmd =
+        qq{export KTD_HOME=$ktd_home && export PATH=\$KTD_HOME/bin:\$PATH && ktd --name $instance_name --shell --run "source ~/.bashrc && $test_cmd"};
+    my $exec = system($full_cmd);
+
+    $rc  = ( $exec >> 8 );
+    $sig = ( $exec & 127 );
+
+    if ( $rc != 0 || $sig != 0 ) {
+        if ( $sig != 0 ) {
+            printf "Process killed by signal %d\n", $sig;
+        } elsif ( $rc != 0 ) {
+            if ( $rc == -1 ) {
+                print "Failed to execute: $!\n";
+            } else {
+                printf "Process exited with value %d\n", $rc;
+            }
         }
         dump_container_diagnostics($instance_name);
 
@@ -355,11 +363,11 @@ my $test_exit_code = 0;
             print "PARTIAL FAILURE: Some expected JUnit results are missing.\n";
             print "  Found:   " . join( ', ', map { s|.*/||r } @found ) . "\n";
             print "  Missing: " . join( ', ', @missing ) . "\n";
-            $test_exit_code = 1;
+            $rc = 1;
         } else {
             print "FATAL: No JUnit results found. Infrastructure or execution failure.\n";
             print "  Expected: " . join( ', ', @expected_patterns ) . "\n" if @expected_patterns;
-            $test_exit_code = 1;
+            $rc = 1;
         }
     }
 }
@@ -386,7 +394,7 @@ if ($cleanup) {
     print "  rm -rf $tmp_dir\n";
 }
 
-exit $test_exit_code;
+exit $rc;
 
 # Subroutines
 
