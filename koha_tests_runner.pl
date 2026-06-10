@@ -134,10 +134,32 @@ my $original_dir = getcwd();
 # Clone KTD into temp directory
 if ( defined $initial_docker_cleanup && $initial_docker_cleanup ne '' ) {
     if ( $initial_docker_cleanup eq 'full' ) {
-        print "Running full Docker cleanup...\n";
+        print "Running full Docker cleanup (removing all containers, images, volumes)...\n";
+        run_cmd(
+            "docker ps -aq | xargs -r docker rm -f",
+            { exit_on_error => 0, real_time => $verbose }
+        );
         run_cmd(
             "docker system prune -a -f --volumes",
             { exit_on_error => 1, real_time => $verbose }
+        );
+    } elsif ( $initial_docker_cleanup eq 'containers' ) {
+        print "Removing all Docker containers and pruning freed resources...\n";
+        run_cmd(
+            "docker ps -aq | xargs -r docker rm -f",
+            { exit_on_error => 0, real_time => $verbose }
+        );
+        run_cmd(
+            "docker image prune -f",
+            { exit_on_error => 0, real_time => $verbose }
+        );
+        run_cmd(
+            "docker volume prune -f",
+            { exit_on_error => 0, real_time => $verbose }
+        );
+        run_cmd(
+            "docker network prune -f",
+            { exit_on_error => 0, real_time => $verbose }
         );
     } elsif ( $initial_docker_cleanup =~ /^(\d+)d$/ ) {
         print "Removing Docker images older than $1 days...\n";
@@ -146,7 +168,7 @@ if ( defined $initial_docker_cleanup && $initial_docker_cleanup ne '' ) {
             { exit_on_error => 0, real_time => $verbose }
         );
     } else {
-        die "Invalid --initial-docker-cleanup value '$initial_docker_cleanup'. Use 'full' or 'Nd' (e.g. '7d')\n";
+        die "Invalid --initial-docker-cleanup value '$initial_docker_cleanup'. Use 'full', 'containers', or 'Nd' (e.g. '7d')\n";
     }
 } elsif ( defined $initial_docker_cleanup ) {
 
@@ -623,9 +645,10 @@ OPTIONS:
 
   --initial-docker-cleanup[=MODE]
       Clean up Docker resources before starting. Modes:
-        (no value)  Remove dangling images, unused volumes and networks (safe)
-        full        Run 'docker system prune -a -f --volumes' (removes everything)
-        Nd          Remove images older than N days (e.g. 7d)
+        (no value)   Remove dangling images, unused volumes and networks (safe)
+        containers   Remove all containers, then prune dangling images/volumes/networks
+        full         Remove all containers, images, and volumes (nuclear option)
+        Nd           Remove images older than N days (e.g. 7d)
 
   --warmup-timeout <seconds>
       Timeout in seconds to wait for KTD instance to be ready (default: 300).
