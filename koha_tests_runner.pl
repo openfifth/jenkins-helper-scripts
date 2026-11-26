@@ -573,7 +573,9 @@ sub expected_junit_files {
 
 sub missing_junit_patterns {
     my ($repo_dir) = @_;
-    return grep { !glob("$repo_dir/$_") } expected_junit_patterns();
+    # glob in scalar context is an iterator tied to the call site and ignores
+    # its argument until exhausted, so force list context here.
+    return grep { my @matches = glob("$repo_dir/$_"); !@matches } expected_junit_patterns();
 }
 
 sub dump_container_diagnostics {
